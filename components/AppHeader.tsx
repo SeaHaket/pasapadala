@@ -7,8 +7,8 @@ export default function AppHeader() {
   return (
     <header className="app-header">
       <div className="app-header__logo">
-        <Image src="/logo.svg" alt="PasaPay" width={28} height={28} />
-        <span>PasaPay</span>
+        <Image src="/logo.svg" alt="PasaPadala" width={28} height={28} />
+        <span>PasaPadala</span>
       </div>
       <div className="app-header__actions">
         <Link href="/settings" aria-label="Settings">

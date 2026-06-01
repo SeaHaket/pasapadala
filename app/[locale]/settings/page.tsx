@@ -22,7 +22,7 @@ export default function SettingsPage() {
         {/* Support — required by MiniPay listing rules */}
         <div className="card" style={{ marginBottom: 16 }}>
           <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12, fontWeight: 700, textTransform: "uppercase" }}>{t("support")}</p>
-          <a href="https://t.me/pasapay_support" target="_blank" rel="noopener noreferrer" className="settings-row">
+          <a href="https://t.me/pasapadala_support" target="_blank" rel="noopener noreferrer" className="settings-row">
             <div className="settings-row__left">
               <span className="settings-row__icon"><MessageCircle size={20} /></span>
               <span className="settings-row__label">{t("supportLink")}</span>
@@ -50,7 +50,7 @@ export default function SettingsPage() {
         </div>
 
         <p style={{ textAlign: "center", fontSize: 12, color: "var(--text-secondary)", marginTop: 24, lineHeight: 1.8 }}>
-          PasaPay v{APP_VERSION} · Powered by Celo MiniPay{"\n"}
+          PasaPadala v{APP_VERSION} · Powered by Stellar{"\n"}
           <span style={{ opacity: 0.6 }}>Built by SeaHaket</span>
         </p>
       </main>

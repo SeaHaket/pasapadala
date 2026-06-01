@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { X, Edit2, Trash2, Check } from "lucide-react";
 import { loadContacts, deleteContact, updateContact, type Contact } from "./RecipientInput";
-import { truncateAddress } from "@/lib/celoscan";
+import { truncateAddress } from "./RecipientInput";
 
 type Props = {
   route: string;

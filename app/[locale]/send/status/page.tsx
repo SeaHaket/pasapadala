@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
@@ -6,7 +7,7 @@ import StatusTracker from "@/components/StatusTracker";
 import BlockchainReceipt from "@/components/BlockchainReceipt";
 import { loadHistory } from "@/lib/history";
 
-type TxData = { hash: string; route: string; chain: "celo" | "bsc" };
+type TxData = { hash: string; route: string; chain: "stellar" };
 
 export default function StatusPage() {
   const t = useTranslations("status");
@@ -37,7 +38,7 @@ export default function StatusPage() {
         <StatusTracker status="success" txHash={tx.hash} />
 
         <div style={{ marginTop: 24 }}>
-          <BlockchainReceipt txHash={tx.hash} chain={tx.chain} />
+          <BlockchainReceipt txHash={tx.hash} />
         </div>
       </main>
 

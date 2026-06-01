@@ -13,8 +13,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "PasaPay — Send Money Home",
-  description: "Fast, low-cost remittance powered by Celo MiniPay. Send stablecoins to the Philippines in seconds.",
+  title: "PasaPadala — Send Money Home",
+  description: "Fast, low-cost remittance powered by Stellar & Decaf. Send stablecoins in seconds.",
   icons: {
     icon: "/favicon.svg",
     apple: "/logo.svg",

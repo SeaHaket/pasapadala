@@ -1,14 +1,18 @@
 "use client";
+
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { celoscanTx, bscscanTx } from "@/lib/celoscan";
+import { STELLAR_NETWORK } from "@/lib/constants";
 
-type Props = { txHash: string; chain?: "celo" | "bsc" };
+type Props = { txHash: string };
 
-export default function BlockchainReceipt({ txHash, chain = "celo" }: Props) {
+export default function BlockchainReceipt({ txHash }: Props) {
   const t = useTranslations("status");
   const [copied, setCopied] = useState(false);
-  const url = chain === "bsc" ? bscscanTx(txHash) : celoscanTx(txHash);
+  
+  const url = STELLAR_NETWORK === "PUBLIC"
+    ? `https://stellar.expert/explorer/public/tx/${txHash}`
+    : `https://stellar.expert/explorer/testnet/tx/${txHash}`;
 
   async function copy() {
     await navigator.clipboard.writeText(txHash);
@@ -20,7 +24,7 @@ export default function BlockchainReceipt({ txHash, chain = "celo" }: Props) {
     <div className="receipt-box">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase" }}>
-          {chain === "bsc" ? "BscScan" : "Celoscan"} Receipt
+          Stellar Expert Receipt
         </span>
         <button onClick={copy} className="btn btn--ghost" style={{ width: "auto", padding: "2px 8px", fontSize: 12 }}>
           {copied ? "✅ Copied!" : "Copy"}

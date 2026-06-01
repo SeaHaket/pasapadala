@@ -1,14 +1,15 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Home, Send, Clock, PiggyBank, Inbox, ChevronDown, ChevronUp, ExternalLink, Copy, Check } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import { loadHistory, type HistoryEntry } from "@/lib/history";
-import { celoscanTx, bscscanTx } from "@/lib/celoscan";
+import { STELLAR_NETWORK } from "@/lib/constants";
 
 const ROUTE_LABELS: Record<string, string> = {
-  minipay: "MiniPay",
+  minipay: "Stellar P2P",
   localcrypto: "Local Exchange",
   fonbnk: "Fonbnk",
   transak: "Bank Transfer",
@@ -16,12 +17,13 @@ const ROUTE_LABELS: Record<string, string> = {
 
 const ROUTE_COLORS: Record<string, string> = {
   minipay: "var(--green)",
-  localcrypto: "#FF9800",
+  localcrypto: "#2775CA",
   fonbnk: "#9C27B0",
   transak: "#2196F3",
 };
 
 function truncateHash(hash: string) {
+  if (!hash) return "";
   return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
 }
 
@@ -36,7 +38,10 @@ function TxCard({ entry }: { entry: HistoryEntry }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const explorerUrl = entry.chain === "bsc" ? bscscanTx(entry.hash) : celoscanTx(entry.hash);
+  const explorerUrl = STELLAR_NETWORK === "PUBLIC"
+    ? `https://stellar.expert/explorer/public/tx/${entry.hash}`
+    : `https://stellar.expert/explorer/testnet/tx/${entry.hash}`;
+    
   const routeColor = ROUTE_COLORS[entry.route] ?? "var(--text-secondary)";
   const routeLabel = ROUTE_LABELS[entry.route] ?? entry.route;
 
@@ -96,21 +101,23 @@ function TxCard({ entry }: { entry: HistoryEntry }) {
           onClick={e => e.stopPropagation()}
         >
           {/* Recipient address */}
-          <div style={{ marginBottom: 12 }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", marginBottom: 3 }}>
-              Recipient Address
-            </p>
-            <p style={{ fontSize: 13, fontFamily: "monospace", wordBreak: "break-all", color: "var(--text)" }}>
-              {entry.recipientAddress}
-            </p>
-          </div>
+          {entry.recipientAddress && (
+            <div style={{ marginBottom: 12 }}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", marginBottom: 3 }}>
+                Recipient Address
+              </p>
+              <p style={{ fontSize: 13, fontFamily: "monospace", wordBreak: "break-all", color: "var(--text)" }}>
+                {entry.recipientAddress}
+              </p>
+            </div>
+          )}
 
           {/* Network */}
           <div style={{ marginBottom: 12 }}>
             <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", marginBottom: 3 }}>
               Network
             </p>
-            <p style={{ fontSize: 13 }}>{entry.chain === "bsc" ? "BNB Smart Chain" : "Celo"}</p>
+            <p style={{ fontSize: 13 }}>Stellar Network</p>
           </div>
 
           {/* TX Hash */}
@@ -122,27 +129,31 @@ function TxCard({ entry }: { entry: HistoryEntry }) {
               <p style={{ fontSize: 12, fontFamily: "monospace", color: "var(--text)", flex: 1, wordBreak: "break-all" }}>
                 {truncateHash(entry.hash)}
               </p>
-              <button
-                className="btn btn--ghost"
-                style={{ width: "auto", padding: "4px 10px", fontSize: 12, flexShrink: 0 }}
-                onClick={copyHash}
-              >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-              </button>
+              {entry.hash !== "fonbnk" && (
+                <button
+                  className="btn btn--ghost"
+                  style={{ width: "auto", padding: "4px 10px", fontSize: 12, flexShrink: 0 }}
+                  onClick={copyHash}
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                </button>
+              )}
             </div>
           </div>
 
           {/* Block explorer link */}
-          <a
-            href={explorerUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn--secondary"
-            style={{ fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-          >
-            <ExternalLink size={14} />
-            View on {entry.chain === "bsc" ? "BscScan" : "Celoscan"}
-          </a>
+          {entry.hash !== "fonbnk" && (
+            <a
+              href={explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn--secondary"
+              style={{ fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+            >
+              <ExternalLink size={14} />
+              View on Stellar Expert
+            </a>
+          )}
         </div>
       )}
     </div>

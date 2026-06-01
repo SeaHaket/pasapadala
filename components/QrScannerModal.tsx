@@ -2,15 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Camera, Upload } from "lucide-react";
 
-// Matches plain 0x EVM addresses and strips common URI prefixes:
-// ethereum:0x...  /  celo:0x...  /  bsc:0x...  and ?query params
-const WALLET_RE = /^0x[0-9a-fA-F]{40}$/;
+// Matches plain Stellar public keys (56 characters, uppercase, starting with 'G'):
+const WALLET_RE = /^G[A-Z0-9]{55}$/;
 
 function parseAddress(raw: string): string | null {
   const stripped = raw
-    .replace(/^(ethereum|celo|arbitrum|bsc|binance|eip155:\d+):/i, "")
+    .replace(/^(web\+stellar:pay\?destination=|stellar:|web\+stellar:)/i, "")
+    .split("&")[0] // Extract destination parameter if part of a full query string
     .split("?")[0]
-    .split("@")[0]
     .trim();
   return WALLET_RE.test(stripped) ? stripped : null;
 }
@@ -122,7 +121,7 @@ export default function QrScannerModal({ onScan, onClose }: Props) {
       }}>
         <div style={{ flex: 1 }}>
           <p style={{ color: "#fff", fontWeight: 700, fontSize: 16, margin: 0 }}>Scan Wallet QR Code</p>
-          <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, margin: "2px 0 0" }}>Celo or BNB Smart Chain address</p>
+          <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, margin: "2px 0 0" }}>Stellar address or payment link</p>
         </div>
         {/* Hidden file input for image upload */}
         <input

@@ -1,40 +1,35 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useCallback } from "react";
-import { createPublicClient, http, encodeFunctionData, erc20Abi } from "viem";
-import { celo } from "viem/chains";
-import { useMiniPay } from "@/hooks/useMiniPay";
-import { PASAPAY_BATCH_ROUTER_ADDRESS, CELO_RPC } from "@/lib/constants";
+import {
+  TransactionBuilder,
+  Operation,
+  Asset,
+  BASE_FEE,
+  Networks,
+  Memo,
+} from "@stellar/stellar-sdk";
+import { useStellarWallet } from "@/hooks/useStellarWallet";
+import {
+  getHorizonServer,
+} from "@/lib/stellar";
+import {
+  STELLAR_NETWORK,
+  USDC_ASSET_CODE,
+  USDC_ISSUER,
+} from "@/lib/constants";
 
-// Minimal ABI for PasaPayBatchRouter
-const BATCH_ROUTER_ABI = [
-  {
-    name: "batchTransferERC20",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "token", type: "address" },
-      { name: "recipients", type: "address[]" },
-      { name: "amounts", type: "uint256[]" },
-    ],
-    outputs: [],
-  },
-] as const;
-
-export type BatchSendStatus = "idle" | "checking" | "approving" | "sending" | "success" | "error";
+export type BatchSendStatus = "idle" | "checking" | "sending" | "success" | "error";
 
 export function useBatchSend() {
-  const { address, sendTransaction } = useMiniPay();
+  const { address, signAndSubmitXdr } = useStellarWallet();
   const [status, setStatus] = useState<BatchSendStatus>("idle");
   const [error, setError] = useState<string | null>(null);
 
   const sendBatch = useCallback(
     async (
-      tokenAddress: `0x${string}`,
-      recipients: `0x${string}`[],
-      amounts: bigint[],
-      feeCurrency: `0x${string}`,
+      recipients: string[],
+      amounts: string[], // Amounts in human units (e.g. "50.50" USDC)
       onProgressStep?: (step: string) => void
     ): Promise<string> => {
       if (!address) {
@@ -51,115 +46,76 @@ export function useBatchSend() {
         throw new Error(errMsg);
       }
 
-      const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-      if (!PASAPAY_BATCH_ROUTER_ADDRESS || PASAPAY_BATCH_ROUTER_ADDRESS === ZERO_ADDRESS) {
-        const errMsg = "Batch Router address is not configured. Please define NEXT_PUBLIC_PASAPAY_BATCH_ROUTER_ADDRESS in .env.local";
+      if (recipients.length !== amounts.length) {
+        const errMsg = "Recipients and amounts length mismatch";
         setError(errMsg);
         setStatus("error");
         throw new Error(errMsg);
       }
 
-      for (const rec of recipients) {
-        if (!rec || rec === ZERO_ADDRESS) {
-          const errMsg = "Configuration error: Fonbnk Pool Address is not defined in .env.local";
-          setError(errMsg);
-          setStatus("error");
-          throw new Error(errMsg);
-        }
-      }
-
       setStatus("checking");
       setError(null);
+      onProgressStep?.("Preparing Stellar transaction…");
 
       try {
-        const publicClient = createPublicClient({
-          chain: celo,
-          transport: http(CELO_RPC),
+        const server = getHorizonServer();
+        const networkPassphrase = STELLAR_NETWORK === "PUBLIC" ? Networks.PUBLIC : Networks.TESTNET;
+        const usdcAsset = new Asset(USDC_ASSET_CODE, USDC_ISSUER);
+
+        // 1. Load active account details to retrieve sequence number
+        const sourceAccount = await server.loadAccount(address);
+
+        // 2. Build multi-operation transaction natively
+        // Stellar supports up to 100 operations per transaction.
+        // Each recipient payment is loaded as a separate Operation.payment.
+        const txBuilder = new TransactionBuilder(sourceAccount, {
+          fee: (BigInt(BASE_FEE) * BigInt(recipients.length)).toString(), // Scaling fee per operation
+          networkPassphrase,
         });
 
-        // 1. Calculate cumulative sum
-        const cumulativeSum = amounts.reduce((sum, amt) => sum + amt, 0n);
+        for (let i = 0; i < recipients.length; i++) {
+          const dest = recipients[i];
+          const amount = parseFloat(amounts[i]).toFixed(7); // Stellar native assets support up to 7 decimal precision
 
-        // 2. Read current ERC20 allowance given to PasaPayBatchRouter
-        onProgressStep?.("Checking token approval…");
-        const allowance = await publicClient.readContract({
-          address: tokenAddress,
-          abi: erc20Abi,
-          functionName: "allowance",
-          args: [address, PASAPAY_BATCH_ROUTER_ADDRESS],
-        });
-
-        // 3. Trigger ERC20 approve if allowance is insufficient
-        if (allowance < cumulativeSum) {
-          setStatus("approving");
-          onProgressStep?.("Approving batch router…");
-          
-          const approveData = encodeFunctionData({
-            abi: erc20Abi,
-            functionName: "approve",
-            args: [PASAPAY_BATCH_ROUTER_ADDRESS, cumulativeSum],
-          });
-
-          let approveHash: string;
-          try {
-            approveHash = await sendTransaction({
-              to: tokenAddress,
-              data: approveData,
-              feeCurrency,
-            });
-          } catch (err: any) {
-            // MiniPay compliance error code interceptor
-            if (err?.code === -32604 || err?.code === -32000 || err?.message?.includes("rejected")) {
-              throw new Error("Approval canceled by user");
-            }
-            throw err;
+          if (!dest || dest.length < 56 || !dest.startsWith("G")) {
+            throw new Error(`Invalid Stellar recipient address at index ${i}: ${dest}`);
           }
 
-          onProgressStep?.("Awaiting approval confirmation…");
-          await publicClient.waitForTransactionReceipt({
-            hash: approveHash as `0x${string}`,
-            timeout: 60_000,
-          });
+          txBuilder.addOperation(
+            Operation.payment({
+              destination: dest,
+              asset: usdcAsset,
+              amount: amount,
+            })
+          );
         }
 
-        // 4. Execute the batchTransferERC20 contract method call
+        // Add a nice memo to identify batch payment
+        txBuilder.addMemo(Memo.text("PasaPay Batch"));
+
+        // Optional memo annotation
+        const tx = txBuilder.setTimeout(60).build();
+        const xdr = tx.toXDR();
+
+        // 3. Send transaction to wallet interface to sign and submit
         setStatus("sending");
-        onProgressStep?.("Sending batch transaction…");
+        onProgressStep?.("Awaiting wallet confirmation…");
 
-        const batchData = encodeFunctionData({
-          abi: BATCH_ROUTER_ABI,
-          functionName: "batchTransferERC20",
-          args: [tokenAddress, recipients, amounts],
-        });
-
-        let txHash: string;
-        try {
-          txHash = await sendTransaction({
-            to: PASAPAY_BATCH_ROUTER_ADDRESS,
-            data: batchData,
-            feeCurrency,
-          });
-        } catch (err: any) {
-          // MiniPay compliance error code interceptor
-          if (err?.code === -32604 || err?.code === -32000 || err?.message?.includes("rejected")) {
-            throw new Error("Batch send transaction canceled by user");
-          }
-          throw err;
-        }
+        const txHash = await signAndSubmitXdr(xdr);
 
         setStatus("success");
         onProgressStep?.("");
         return txHash;
       } catch (err: any) {
-        console.error("Batch send error:", err);
-        const errMsg = err?.message ?? "Batch transaction failed";
+        console.error("Stellar batch send error:", err);
+        const errMsg = err?.response?.data?.extras?.result_codes?.transaction || err?.message || "Batch send transaction failed";
         setError(errMsg);
         setStatus("error");
         onProgressStep?.("");
         throw new Error(errMsg);
       }
     },
-    [address, sendTransaction]
+    [address, signAndSubmitXdr]
   );
 
   return { sendBatch, status, error, setStatus, setError };

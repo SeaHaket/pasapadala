@@ -2,7 +2,10 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { ScanLine, Settings } from "lucide-react";
-import { truncateAddress } from "@/lib/celoscan";
+export function truncateAddress(addr: string): string {
+  if (!addr) return "";
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}
 import { OfframpProvider } from "@/config/countries";
 import dynamic from "next/dynamic";
 
@@ -18,10 +21,10 @@ export type Contact = {
 
 type Props = {
   route: OfframpProvider;
-  onResolved: (address: `0x${string}` | null, display: string) => void;
+  onResolved: (address: string | null, display: string) => void;
 };
 
-const WALLET_RE = /^0x[0-9a-fA-F]{40}$/;
+const WALLET_RE = /^G[A-Z0-9]{55}$/;
 
 export function loadContacts(): Contact[] {
   try { return JSON.parse(localStorage.getItem("pp_contacts") || "[]"); } catch { return []; }
@@ -113,7 +116,7 @@ export default function RecipientInput({ route, onResolved }: Props) {
         setWalletValue("");
         setError(null);
         resetSave();
-        onResolved(contact.address as `0x${string}`, contact.name || contact.address);
+        onResolved(contact.address, contact.name || contact.address);
         const existing = findContact(contact.address);
         if (existing?.name) setSavedAsName(existing.name);
       }
@@ -128,7 +131,7 @@ export default function RecipientInput({ route, onResolved }: Props) {
     setError(null);
     resetSave();
     if (WALLET_RE.test(v)) {
-      onResolved(v as `0x${string}`, truncateAddress(v));
+      onResolved(v, truncateAddress(v));
       const existing = findContact(v);
       if (existing?.name) setSavedAsName(existing.name);
     } else {
@@ -253,7 +256,7 @@ export default function RecipientInput({ route, onResolved }: Props) {
           <p style={{ color: "#FF9800", fontSize: 13, lineHeight: 1.4, margin: 0, display: "flex", gap: 6, alignItems: "flex-start" }}>
             <span style={{ fontSize: 16 }}>⚠️</span>
             <span>
-              <strong>Important:</strong> Paste a <strong>BNB Smart Chain (BSC)</strong> network address from your local exchange account. Do not use other networks or your funds will be lost!
+              <strong>Important:</strong> Paste a <strong>Stellar</strong> network address from your local exchange account (like Coins.ph, Bitso, Lemon Cash, or PDAX). Do not use other networks or your funds will be lost!
             </span>
           </p>
         </div>
@@ -302,7 +305,7 @@ export default function RecipientInput({ route, onResolved }: Props) {
                   setError(null);
                   setSavedAsName(c.name || null);
                   setShowSaveForm(false);
-                  onResolved(c.address as `0x${string}`, c.name || c.display);
+                  onResolved(c.address, c.name || c.display);
                 }}
               >
                 {contactLabel(c)}

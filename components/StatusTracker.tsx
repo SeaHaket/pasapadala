@@ -1,18 +1,21 @@
 "use client";
-import { useTranslations } from "next-intl";
-import type { BridgeStatus } from "@/hooks/useLifi";
 
-type Props = { status: BridgeStatus; txHash?: string | null; bridge?: string };
+import { useTranslations } from "next-intl";
+
+type Props = {
+  status: "pending" | "success" | "error";
+  txHash?: string | null;
+  bridge?: string;
+};
 
 const STEPS = [
-  { key: "step1", label: (t: any) => t("step1") },
-  { key: "step2", label: (t: any) => t("step2") },
-  { key: "step3", label: (t: any) => t("step3") },
+  { key: "step1", label: (t: any) => t("step1") }, // Initiating
+  { key: "step2", label: (t: any) => t("step2") }, // Processing
+  { key: "step3", label: (t: any) => t("step3") }, // Finalized
 ];
 
-function stepIndex(status: BridgeStatus): number {
-  if (status === "approving") return 0;
-  if (status === "bridging" || status === "pending") return 1;
+function stepIndex(status: "pending" | "success" | "error"): number {
+  if (status === "pending") return 1;
   if (status === "success") return 3;
   return 0;
 }
@@ -31,6 +34,7 @@ export default function StatusTracker({ status, txHash, bridge }: Props) {
       <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>
         {isSuccess ? t("success") : isError ? t("error") : t("pending")}
       </h2>
+      
       {bridge && !isSuccess && !isError && (
         <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>{t("via", { bridge })}</p>
       )}

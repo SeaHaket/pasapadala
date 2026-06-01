@@ -1,37 +1,56 @@
 "use client";
+
 import { useState, useEffect } from "react";
-import { useRouter, Link } from "@/i18n/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
-import { parseUnits, encodeFunctionData, erc20Abi } from "viem";
 import { ChevronLeft } from "lucide-react";
-import { useMiniPay } from "@/hooks/useMiniPay";
+import { useStellarWallet } from "@/hooks/useStellarWallet";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import { useLifi } from "@/hooks/useLifi";
 import { useBatchSend } from "@/hooks/useBatchSend";
 import Numpad from "@/components/Numpad";
 import RouteSelector, { type SendRoute } from "@/components/RouteSelector";
 import RecipientInput from "@/components/RecipientInput";
 import FeeBreakdown from "@/components/FeeBreakdown";
-import { MINIPAY_DEPOSIT_DEEPLINK, PASAPAY_FEE_ADDRESS, FONBNK_APP_FEE, FONBNK_POOL_ADDRESS, CELO_RPC } from "@/lib/constants";
+import {
+  DECAF_DEPOSIT_DEEPLINK,
+  USDC_ASSET_CODE,
+  USDC_ISSUER,
+  STELLAR_NETWORK,
+} from "@/lib/constants";
+import {
+  TransactionBuilder,
+  Operation,
+  Asset,
+  BASE_FEE,
+  Networks,
+} from "@stellar/stellar-sdk";
+import { getHorizonServer } from "@/lib/stellar";
 import { COUNTRIES, getCountryConfig, type OfframpProvider } from "@/config/countries";
-import { executeBridge } from "@/lib/lifi";
 import { saveTransaction } from "@/lib/history";
 
 export default function SendPage() {
   const t = useTranslations("send");
   const router = useRouter();
-  const { address, preferred, totalUsd, sendTransaction, refreshBalances } = useMiniPay();
+  
+  // Use our new Stellar wallet hook
+  const {
+    address,
+    preferred,
+    totalUsd,
+    signAndSubmitXdr,
+    refreshBalances,
+    redirectToDeposit,
+  } = useStellarWallet();
+  
   const { sendBatch } = useBatchSend();
   
   const [countryId, setCountryId] = useState("PH");
   const country = getCountryConfig(countryId);
   const { rate, toLocalFiat } = useExchangeRate(country.currencyCode);
-  
-  const { quote, status: bridgeStatus, fetchQuote } = useLifi();
 
   const [amount, setAmount] = useState("0");
   const [route, setRoute] = useState<SendRoute | null>(null);
-  const [recipientAddress, setRecipientAddress] = useState<`0x${string}` | null>(null);
+  const [recipientAddress, setRecipientAddress] = useState<string | null>(null);
   const [recipientDisplay, setRecipientDisplay] = useState("");
   const [step, setStep] = useState<"amount" | "route" | "recipient" | "review">("amount");
   const [isQuickSend, setIsQuickSend] = useState(false);
@@ -44,16 +63,19 @@ export default function SendPage() {
     const raw = sessionStorage.getItem("pp_quicksend");
     if (!raw) return;
     sessionStorage.removeItem("pp_quicksend");
-      try {
-        const qs = JSON.parse(raw);
-        const VALID_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
-        const VALID_ROUTES: SendRoute[] = ["minipay", "localcrypto", "transak", "fonbnk"];
-        const VALID_COUNTRIES = /^[A-Z]{2}$/;
-        // Reject the payload if the address is present but malformed
-        if (qs.recipientAddress && !VALID_ADDRESS.test(qs.recipientAddress)) return;
-        if (qs.recipientAddress) setRecipientAddress(qs.recipientAddress as `0x${string}`);
-      if (qs.recipientDisplay && typeof qs.recipientDisplay === "string")
+    try {
+      const qs = JSON.parse(raw);
+      // Valid Stellar public key regex
+      const VALID_ADDRESS = /^G[A-Z0-9]{55}$/;
+      const VALID_ROUTES: SendRoute[] = ["minipay", "localcrypto", "transak", "fonbnk"];
+      const VALID_COUNTRIES = /^[A-Z]{2}$/;
+      
+      if (qs.recipientAddress && !VALID_ADDRESS.test(qs.recipientAddress)) return;
+      if (qs.recipientAddress) setRecipientAddress(qs.recipientAddress);
+      
+      if (qs.recipientDisplay && typeof qs.recipientDisplay === "string") {
         setRecipientDisplay(qs.recipientDisplay.slice(0, 100));
+      }
       if (qs.countryId && VALID_COUNTRIES.test(qs.countryId)) setCountryId(qs.countryId);
       if (qs.route && VALID_ROUTES.includes(qs.route)) setRoute(qs.route as SendRoute);
       setIsQuickSend(true);
@@ -62,14 +84,6 @@ export default function SendPage() {
 
   const amountNum = parseFloat(amount) || 0;
   const hasBalance = amountNum > 0 && amountNum <= (preferred?.human ?? 0);
-
-  // Auto-fetch bridge quote when on review step for localcrypto
-  useEffect(() => {
-    if (step === "review" && route === "localcrypto" && address && recipientAddress && preferred && amountNum > 0 && rate) {
-      const raw = parseUnits(amount, preferred.decimals);
-      fetchQuote({ fromAddress: address, toAddress: recipientAddress, token: preferred, amountRaw: raw, exchangeRate: rate ?? 0 });
-    }
-  }, [step, route]);
 
   async function handleConfirm() {
     if (route === "fonbnk") {
@@ -80,7 +94,7 @@ export default function SendPage() {
       saveTransaction({
         timestamp: Date.now(),
         hash: "fonbnk",
-        chain: "celo",
+        chain: "stellar",
         amount,
         tokenSymbol: preferred.symbol,
         route: "fonbnk",
@@ -100,37 +114,40 @@ export default function SendPage() {
 
     if (!address || !preferred || !recipientAddress) return;
     setSending(true);
-    setSendStep("Sending...");
+    setSendStep("Formulating transaction…");
     setSendError(null);
 
     try {
-      let hash: string;
-      let chain: "celo" | "bsc" = "celo";
+      let hash = "";
+      const chain = "stellar" as const;
 
-      if (route === "localcrypto" && quote?.route) {
-        const result = await executeBridge(
-          quote.route,
-          address,
-          preferred.feeCurrency as `0x${string}`,
-          (s) => setSendStep(s),
-        );
-        if (!result.success || !result.txHash) throw new Error(result.error || "Bridge failed — please try again");
-        hash = result.txHash;
-      } else {
-        const amountRaw = parseUnits(amount, preferred.decimals);
-        const data = encodeFunctionData({
-          abi: erc20Abi,
-          functionName: "transfer",
-          args: [recipientAddress, amountRaw],
-        });
-        hash = await sendTransaction({
-          to: preferred.address as `0x${string}`,
-          data,
-          feeCurrency: preferred.feeCurrency as `0x${string}`,
-        });
-      }
+      setSendStep("Awaiting wallet signature…");
+      
+      // Stellar Direct P2P and Exchange withdrawals are both constructed as standard Payment operations
+      const server = getHorizonServer();
+      const sourceAccount = await server.loadAccount(address);
+      const usdcAsset = new Asset(USDC_ASSET_CODE, USDC_ISSUER);
+
+      const txBuilder = new TransactionBuilder(sourceAccount, {
+        fee: BASE_FEE,
+        networkPassphrase: STELLAR_NETWORK === "PUBLIC" ? Networks.PUBLIC : Networks.TESTNET,
+      })
+        .addOperation(
+          Operation.payment({
+            destination: recipientAddress,
+            asset: usdcAsset,
+            amount: amountNum.toFixed(7),
+          })
+        )
+        .setTimeout(60);
+
+      const tx = txBuilder.build();
+      const xdr = tx.toXDR();
+
+      hash = await signAndSubmitXdr(xdr);
 
       sessionStorage.setItem("pp_tx", JSON.stringify({ hash, route, chain }));
+      
       saveTransaction({
         timestamp: Date.now(),
         hash,
@@ -149,7 +166,8 @@ export default function SendPage() {
       await refreshBalances();
       router.push("/send/status");
     } catch (err: any) {
-      setSendError(err?.message ?? "Transaction failed");
+      const errMsg = err?.response?.data?.extras?.result_codes?.transaction || err?.message || "Transaction failed";
+      setSendError(errMsg);
       setSending(false);
       setSendStep("");
     }
@@ -212,18 +230,18 @@ export default function SendPage() {
               onChange={setAmount}
               fiatDisplay={toLocalFiat(amountNum, country.currencySymbol)}
               tokenSymbol={preferred?.symbol}
-              maxDecimals={preferred?.decimals === 18 ? 6 : preferred?.decimals ?? 6}
+              maxDecimals={7}
             />
             {totalUsd === 0 && (
-              <div className="card" style={{ textAlign: "center", margin: "16px 0" }}>
+              <div className="card" style={{ textAlign: "center", margin: "16px 0", border: "1px solid rgba(255,255,255,0.1)" }}>
                 <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 12 }}>{t("insufficientBalance")}</p>
-                <a href={MINIPAY_DEPOSIT_DEEPLINK} className="btn btn--primary">{t("depositCTA")}</a>
+                <button onClick={redirectToDeposit} className="btn btn--primary">Onramp via Decaf</button>
               </div>
             )}
             {isQuickSend && recipientDisplay && (
               <div className="card" style={{ marginTop: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--green)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                  {recipientDisplay.startsWith("0x") ? recipientDisplay.slice(2, 4).toUpperCase() : recipientDisplay.slice(0, 2).toUpperCase()}
+                  {recipientDisplay.startsWith("G") ? recipientDisplay.slice(0, 2).toUpperCase() : recipientDisplay.slice(0, 2).toUpperCase()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: 0 }}>Sending to</p>
@@ -292,12 +310,9 @@ export default function SendPage() {
             )}
 
             <FeeBreakdown
-              bridgeQuote={route === "localcrypto" ? quote : undefined}
               toLocalFiat={(usd) => toLocalFiat(usd, country.currencySymbol)}
-              isLoading={route === "localcrypto" && bridgeStatus === "quoting"}
+              isLoading={false}
             />
-
-
 
             {sendError && (
               <div className="card" style={{ borderColor: "var(--error)", marginTop: 12 }}>
@@ -308,7 +323,7 @@ export default function SendPage() {
             <button
               className="btn btn--primary mt-16"
               onClick={handleConfirm}
-              disabled={sending || (route === "localcrypto" && bridgeStatus === "quoting")}
+              disabled={sending}
             >
               {sending
                 ? <><span className="spinner" /> {sendStep}</>
