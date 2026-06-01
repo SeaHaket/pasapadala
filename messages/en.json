@@ -26,7 +26,7 @@
     "routeTransak": "Withdraw to Bank / e-Wallet",
     "routeMinipayDesc": "Send directly to another MiniPay user",
     "routeFonbnkDesc": "Withdraw {currency} to {examples}",
-    "routeLocalCryptoDesc": "Send Stablecoin to a local wallet via BNB Smart Chain",
+    "routeLocalCryptoDesc": "Send Stablecoin to a local wallet via Stellar Network",
     "routeTransakDesc": "Withdraw {currency} to {examples}",
     "recipientPhone": "Phone Number",
     "recipientPhonePlaceholder": "{placeholder}",
@@ -77,17 +77,17 @@
   "status": {
     "title": "Transfer Status",
     "pending": "Processing...",
-    "approving": "Approving token...",
-    "bridging": "Bridging to BNB Smart Chain...",
+    "approving": "Signing transaction...",
+    "bridging": "Submitting to Stellar...",
     "success": "Transfer Complete!",
     "error": "Transfer Failed",
     "viewReceipt": "View Blockchain Receipt",
     "sendAnother": "Send Another",
     "tryAgain": "Try Again",
     "via": "via {bridge}",
-    "step1": "Initiated on Celo",
-    "step2": "Bridge relay",
-    "step3": "Delivered on BNB Smart Chain"
+    "step1": "Prepared Transaction",
+    "step2": "Submitting to Horizon",
+    "step3": "Confirmed on Stellar Network"
   },
   "history": {
     "title": "Transaction History",

@@ -26,10 +26,9 @@ type RouteItem = {
 };
 
 const ROUTES: RouteItem[] = [
-  { id: "minipay", Icon: Smartphone, color: "var(--green)", titleKey: "routeMinipay", descKey: "routeMinipayDesc" },
   { id: "fonbnk", Icon: Coins, color: "#9C27B0", titleKey: "routeFonbnk", descKey: "routeFonbnkDesc" },
   { id: "transak", Icon: Landmark, color: "#2196F3", titleKey: "routeTransak", descKey: "routeTransakDesc", comingSoon: true },
-  { id: "localcrypto", Icon: CircleDollarSign, color: "#FF9800", titleKey: "routeLocalCrypto", descKey: "routeLocalCryptoDesc", badge: "BSC" },
+  { id: "localcrypto", Icon: CircleDollarSign, color: "#FF9800", titleKey: "routeLocalCrypto", descKey: "routeLocalCryptoDesc", badge: "XLM" },
 ];
 
 export default function RouteSelector({ selected, onSelect, supported, localCryptoName, bankOfframpExample, currencyCode }: Props) {

@@ -24,7 +24,7 @@
     "routeLocalCrypto": "Lokal na Exchange",
     "routeTransak": "I-withdraw sa Bangko / e-Wallet",
     "routeMinipayDesc": "Direktang magpadala sa ibang MiniPay user",
-    "routeLocalCryptoDesc": "Magpadala ng Stablecoin sa isang lokal na wallet sa pamamagitan ng BNB Smart Chain",
+    "routeLocalCryptoDesc": "Magpadala ng Stablecoin sa isang lokal na wallet sa pamamagitan ng Stellar Network",
     "routeTransakDesc": "I-withdraw ang {currency} sa {examples}",
     "recipientPhone": "Numero ng Telepono",
     "recipientPhonePlaceholder": "{placeholder}",
@@ -77,17 +77,17 @@
   "status": {
     "title": "Katayuan ng Paglipat",
     "pending": "Pinoproseso...",
-    "approving": "Inaprubahan ang token...",
-    "bridging": "Ini-bridge sa BNB Smart Chain...",
+    "approving": "Nilalagdaan ang transaksyon...",
+    "bridging": "Ipinapadala sa Stellar...",
     "success": "Kumpleto ang Paglipat!",
     "error": "Nabigo ang Paglipat",
     "viewReceipt": "Tingnan ang Blockchain Receipt",
     "sendAnother": "Magpadala Muli",
     "tryAgain": "Subukan Muli",
     "via": "sa pamamagitan ng {bridge}",
-    "step1": "Sinimulan sa Celo",
-    "step2": "Bridge relay",
-    "step3": "Naihatid sa BNB Smart Chain"
+    "step1": "Inihandang Transaksyon",
+    "step2": "Ipinapadala sa Horizon",
+    "step3": "Kumpirmado sa Stellar Network"
   },
   "history": {
     "title": "Kasaysayan ng Transaksyon",
